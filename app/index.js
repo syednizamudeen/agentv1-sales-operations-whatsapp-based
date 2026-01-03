@@ -49,17 +49,30 @@ app.post("/webhook", async (req, res) => {
             }
         }
 
-        // B. Retrieve chat history for this chat (unique by chatId)
+        // B. Retrieve and trim chat history for this chat (unique by chatId)
         let chatHistory = [];
         if (chatId) {
             const historyRes = await db.query(
-                `SELECT message, response FROM chat_history WHERE chat_id = $1 ORDER BY created_at ASC LIMIT 10`,
+                `SELECT message, response FROM chat_history WHERE chat_id = $1 ORDER BY created_at ASC LIMIT 50`,
                 [chatId]
             );
-            chatHistory = historyRes.rows.map(row => [
+            // Convert to message objects
+            let allHistory = historyRes.rows.map(row => [
                 new HumanMessage(row.message),
                 new SystemMessage(row.response)
             ]).flat();
+
+            // Simple token estimation: 1 token ≈ 4 chars (very rough)
+            const TOKEN_LIMIT = 3000;
+            let tokenCount = 0;
+            // Start from the end (most recent), add until limit
+            for (let i = allHistory.length - 1; i >= 0; i--) {
+                const msg = allHistory[i];
+                const msgText = msg.text || (msg.content && msg.content.text) || JSON.stringify(msg.content || msg);
+                tokenCount += Math.ceil((msgText || '').length / 4);
+                if (tokenCount > TOKEN_LIMIT) break;
+                chatHistory.unshift(msg); // Add to start to preserve order
+            }
         }
 
         // C. Prepare Multimodal Content (current message)
