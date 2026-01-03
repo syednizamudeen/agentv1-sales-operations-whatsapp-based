@@ -1,0 +1,43 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# Docker volumes
+db_data/
+ollama_storage/
+
+# VS Code
+.vscode/
+
+# Build outputs
+dist/
+build/
+
+# Postgres
+*.sql-journal
+
+# Misc
+*.swp
+*.swo
+
+# Ignore database dumps
+*.dump
+*.bak
+*.backup
+
+# Ignore coverage reports
+coverage/
+
+# Ignore local files
+*.local

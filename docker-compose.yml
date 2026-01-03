@@ -1,0 +1,71 @@
+services:
+  # AI Engine: Ollama with Gemma 3
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ollama_storage:/root/.ollama
+    # Note: On Mac, Ollama in Docker uses CPU. For GPU, use the native Mac app instead.
+    entrypoint: /bin/sh
+    command: -c "ollama serve & sleep 5 && ollama pull gemma3:4b && wait"
+    ports:
+      - "11434:11434"
+
+  # This helper container pulls the model once and then shuts down
+  # ollama-pull-model:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama_pull_model
+  #   volumes:
+  #     - ollama_storage:/root/.ollama
+  #   entrypoint: /bin/sh
+  #   command: >
+  #     -c "sleep 5; ollama serve & sleep 5; ollama pull gemma3:4b; pkill ollama"
+  #   depends_on:
+  #     - ollama
+
+  # Database: PostgreSQL for Orders/Purchases
+  db:
+    image: postgres:15
+    container_name: business_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: biz_data
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d biz_data"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend: Node.js Orchestrator
+  app:
+    build: ./app
+    container_name: node_agent
+    depends_on:
+      ollama:
+        condition: service_started
+      db:
+        condition: service_healthy # This waits for the healthcheck above
+    env_file: .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./app:/usr/src/app
+      - /usr/src/app/node_modules
+
+  # Tunnel: Expose your local webhook to the internet for WhatsApp
+  # tunnel:
+  #   image: cloudflare/cloudflared:latest
+  #   command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TOKEN}
+  #   # Or use ngrok if you prefer: image: ngrok/ngrok
+  #   depends_on:
+  #     - app
+
+volumes:
+  ollama_storage:
+  db_data:
